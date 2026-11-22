@@ -1,0 +1,138 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./tablespaces:/var/lib/postgresql/tablespaces/ts1
+    restart: always
+    networks:
+      - gabo-dubz
+
+  pgloader:
+    image: dimitri/pgloader
+    platform: linux/amd64
+    depends_on:
+      - postgres
+    volumes:
+      - ./database:/data
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo "Esperando 20 segundos a que Postgres arranque..."
+        sleep 20
+        echo "Ejecutando pgloader."
+        pgloader /data/creacion.load
+    networks:
+      - gabo-dubz
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - gabo-dubz
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - gabo-dubz
+
+  databasus:
+    image: databasus/databasus:latest
+    container_name: databasus
+    restart: unless-stopped
+    ports:
+      - "4005:4005"
+    depends_on:
+      - postgres
+    environment:
+      - ADMIN_NAME=${DATABASUS_NAME}
+      - ADMIN_EMAIL=${DATABASUS_EMAIL}
+      - ADMIN_PASSWORD=${DATABASUS_PASSWORD}
+    volumes:
+      - databasus_data:/databasus-data
+    networks:
+      - gabo-dubz
+
+  neo4j:
+    image: neo4j:5
+    container_name: neo4j
+    restart: unless-stopped
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=${NEO4J_USER}/${NEO4J_PASSWORD}
+    volumes:
+      - ./neo4j/data:/data
+      - ./neo4j/logs:/logs
+      - ./neo4j/import:/var/lib/neo4j/import
+      - ./neo4j/plugins:/plugins
+    networks:
+      - gabo-dubz
+
+  stackport:
+    image: davireis/stackport:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - AWS_ENDPOINT_URL=http://ministack:4566
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    restart: unless-stopped
+    depends_on:
+      ministack:
+        condition: service_healthy
+    networks:
+      - gabo-dubz
+
+  ministack:
+    image: ministackorg/ministack:latest
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4566/_ministack/health')" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - gabo-dubz
+
+  pyspark:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ${PATH_JUPYTER}:/home/jovyan
+    ports:
+      - "8888:8888"
+    environment:
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN}
+    networks:
+      - gabo-dubz
+
+networks:
+  gabo-dubz:
+    driver: bridge
+
+volumes:
+  databasus_data:
+  pgdata:
+  grafana_data:
