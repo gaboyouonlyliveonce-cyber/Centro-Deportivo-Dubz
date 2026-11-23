@@ -11,6 +11,8 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./tablespaces:/var/lib/postgresql/tablespaces/ts1
+      # Scripts .sql ejecutados en orden alfabético SOLO al crear el volumen pgdata vacío
+      - ./database:/docker-entrypoint-initdb.d:ro
     restart: always
     networks:
       - gabo-dubz
@@ -22,6 +24,12 @@ services:
       - postgres
     volumes:
       - ./database:/data
+    environment:
+      # pgloader toma el destino de las variables estándar de libpq (sin secretos en creacion.load)
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
     entrypoint:
       - bash
       - -c
@@ -119,12 +127,30 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_started
+      ministack:
+        condition: service_healthy
     volumes:
       - ${PATH_JUPYTER}:/home/jovyan
+      - ./etl:/app/etl
+      - ./data_lake:/home/jovyan/data_lake
+      - ./data_lake:/app/data_lake
     ports:
       - "8888:8888"
     environment:
       - JUPYTER_TOKEN=${JUPYTER_TOKEN}
+      # Conexión del ETL (parameters.json solo referencia estos nombres, nunca valores)
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_ETL_USER=${POSTGRES_ETL_USER:-reporting_user1}
+      - POSTGRES_ETL_PASSWORD=${POSTGRES_ETL_PASSWORD:-${POSTGRES_PASSWORD}}
+      - POSTGRES_SSLMODE=${POSTGRES_SSLMODE:-prefer}
+      - DATA_LAKE_LOCAL_PATH=${DATA_LAKE_LOCAL_PATH:-/home/jovyan/data_lake/curated}
     networks:
       - gabo-dubz
 

@@ -1,0 +1,17 @@
+/*
+ * pgloader: alta masiva de clientes nuevos desde ./database/clientes_nuevos.csv
+ *
+ * - Destino y credenciales vienen de las variables PGHOST/PGUSER/PGPASSWORD/PGDATABASE
+ *   que docker-compose.yml pasa al servicio pgloader desde .env (no hay secretos aquí).
+ * - El CSV se entrega solo con encabezado: pgloader termina bien con 0 filas.
+ *   Para dar de alta clientes, agrega filas: nombre,apellido,altura_cm,peso_inicial_kg,telefono
+ * - Requiere que el esquema (01_schema_centro_deportivo.sql) ya exista.
+ */
+LOAD CSV
+     FROM '/data/clientes_nuevos.csv'
+          HAVING FIELDS (nombre, apellido, altura_cm, peso_inicial_kg, telefono)
+     INTO postgresql:///centro_deportivo?clientes (nombre, apellido, altura_cm, peso_inicial_kg, telefono)
+     WITH skip header = 1,
+          fields terminated by ',',
+          fields optionally enclosed by '"'
+      SET client_encoding to 'utf8';

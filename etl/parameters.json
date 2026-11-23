@@ -1,0 +1,117 @@
+{
+  "_nota": "Toda la parametrización del ETL. Los valores ${VAR} o ${VAR:-defecto} se resuelven con variables de entorno (docker-compose las toma de .env). No se guardan secretos reales aquí.",
+  "postgres": {
+    "host": "${POSTGRES_HOST:-postgres}",
+    "port": "${POSTGRES_PORT:-5432}",
+    "database": "${POSTGRES_DB}",
+    "user": "${POSTGRES_ETL_USER:-reporting_user1}",
+    "password": "${POSTGRES_ETL_PASSWORD}",
+    "driver": "org.postgresql.Driver",
+    "sslmode": "${POSTGRES_SSLMODE:-prefer}",
+    "fetchsize": 10000
+  },
+  "spark": {
+    "app_name": "etl-centro-deportivo",
+    "master": "local[2]",
+    "driver_memory": "1g",
+    "shuffle_partitions": 4,
+    "timezone": "America/Mexico_City",
+    "jdbc_jar_path": "/usr/local/spark/jars/postgresql-42.7.3.jar"
+  },
+  "lakehouse": {
+    "endpoint": "${S3_ENDPOINT:-http://ministack:4566}",
+    "region": "${AWS_REGION:-us-east-1}",
+    "access_key": "${AWS_ACCESS_KEY_ID:-test}",
+    "secret_key": "${AWS_SECRET_ACCESS_KEY:-test}",
+    "bucket": "${LAKEHOUSE_BUCKET:-lakehouse-centro-deportivo}",
+    "prefijo_parquet": "parquet",
+    "crear_bucket": true,
+    "iceberg": {
+      "habilitado": true,
+      "catalogo": "lakehouse",
+      "namespace": "centro_deportivo",
+      "prefijo_warehouse": "iceberg"
+    }
+  },
+  "salida": {
+    "ruta_local": "${DATA_LAKE_LOCAL_PATH:-/home/jovyan/data_lake/curated}",
+    "destinos": [
+      "local",
+      "s3"
+    ],
+    "modo_escritura": "overwrite",
+    "compresion": "snappy",
+    "archivos_por_tabla": 1
+  },
+  "negocio": {
+    "fecha_referencia": null,
+    "dias_por_vencer": 3,
+    "dias_gracia_renovacion": 30
+  },
+  "etls": [
+    {
+      "clase": "IngresosRecepcionMensualETL",
+      "habilitado": true,
+      "tabla_destino": "fact_ingresos_recepcion_mensual",
+      "particionar_por": [
+        "categoria"
+      ],
+      "origen": {
+        "consumos": "public.consumos_pendientes",
+        "productos": "public.productos_recepcion",
+        "clientes": "public.vw_clientes_enmascarado"
+      }
+    },
+    {
+      "clase": "RetencionMembresiasETL",
+      "habilitado": true,
+      "tabla_destino": "fact_retencion_membresias",
+      "particionar_por": [
+        "nombre_plan"
+      ],
+      "origen": {
+        "membresias": "public.membresias_clientes",
+        "tipos": "public.tipos_membresia",
+        "clientes": "public.vw_clientes_enmascarado"
+      }
+    },
+    {
+      "clase": "ProgresoAtletasETL",
+      "habilitado": true,
+      "tabla_destino": "fact_progreso_atletas",
+      "particionar_por": [],
+      "origen": {
+        "historial": "public.historial_marcas_clientes",
+        "clientes": "public.vw_clientes_enmascarado"
+      }
+    },
+    {
+      "clase": "CargaEntrenamientosCoachETL",
+      "habilitado": true,
+      "tabla_destino": "fact_entrenamientos_bloques",
+      "particionar_por": [
+        "tipo_bloque"
+      ],
+      "origen": {
+        "entrenamientos": "public.entrenamientos",
+        "bloques": "public.bloques_entrenamiento",
+        "usuarios": "public.vw_usuarios_enmascarado"
+      }
+    },
+    {
+      "clase": "ResumenClientes360ETL",
+      "habilitado": true,
+      "tabla_destino": "dim_clientes_360",
+      "particionar_por": [
+        "estado_membresia"
+      ],
+      "origen": {
+        "clientes": "public.vw_clientes_enmascarado",
+        "membresias": "public.membresias_clientes",
+        "tipos": "public.tipos_membresia",
+        "consumos": "public.consumos_pendientes",
+        "historial": "public.historial_marcas_clientes"
+      }
+    }
+  ]
+}

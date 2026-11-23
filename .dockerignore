@@ -1,0 +1,9 @@
+neo4j/
+notebooks/
+data_lake/
+database/
+docs/
+scripts/
+tablespaces/
+.env
+.git

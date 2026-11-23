@@ -10,6 +10,11 @@ tablespaces/*
 # Jupyter / Python
 .ipynb_checkpoints/
 notebooks/.local/
+notebooks/.npm/
+
+# Salidas generadas por los ETL (Parquet / lakehouse local)
+data_lake/*
+!data_lake/.gitkeep
 __pycache__/
 *.pyc
 
